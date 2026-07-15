@@ -97,6 +97,26 @@ public class RoundTripIntegrationTests
     }
 
     [Test]
+    public async Task Empty_Value_RoundTrips()
+    {
+        Integration.RequireBackend();
+
+        string service = Integration.UniqueService();
+        var store = LatchkeyFactory.Create(service);
+        try
+        {
+            store.Set("empty", ReadOnlySpan<byte>.Empty);
+            var read = store.GetBytes("empty");
+            await Assert.That(read).IsNotNull();
+            await Assert.That(read!.Length).IsEqualTo(0);
+        }
+        finally
+        {
+            store.Delete("empty");
+        }
+    }
+
+    [Test]
     public async Task DetectBackend_Returns_Expected_For_This_OS()
     {
         Integration.RequireBackend();

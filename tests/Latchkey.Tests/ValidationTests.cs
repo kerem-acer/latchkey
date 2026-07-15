@@ -65,6 +65,18 @@ public class ValidationTests
     }
 
     [Test]
+    public async Task ValidateServiceName_Null_Throws_ArgumentNullException()
+    {
+        await Assert.That(() => Validation.ValidateServiceName(null!)).Throws<ArgumentNullException>();
+    }
+
+    [Test]
+    public async Task ValidateKey_Null_Throws_ArgumentNullException()
+    {
+        await Assert.That(() => Validation.ValidateKey(null!)).Throws<ArgumentNullException>();
+    }
+
+    [Test]
     public async Task Create_RejectsOverLongServiceName()
     {
         var name = new string('s', Validation.MaxServiceNameLength + 1);

@@ -34,8 +34,6 @@ internal static partial class CoreFoundation
 /// <summary>Owns a +1-retained CoreFoundation object; releases it via <c>CFRelease</c>.</summary>
 internal sealed class SafeCFTypeHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
-    public SafeCFTypeHandle() : base(ownsHandle: true) { }
-
     public SafeCFTypeHandle(IntPtr handle) : base(ownsHandle: true) => SetHandle(handle);
 
     protected override bool ReleaseHandle()

@@ -46,7 +46,7 @@ public class MacOSIntegrationTests
 
         string service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
-        byte[] data = { 0x00, 0xFF, 0x00, 0x10, 0x00, 0x7F, 0x00 };
+        byte[] data = [0x00, 0xFF, 0x00, 0x10, 0x00, 0x7F, 0x00];
         try
         {
             store.Set("bin", data);

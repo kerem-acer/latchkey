@@ -192,9 +192,10 @@ jobs:
           cat coveragereport/Summary.txt
           cat coveragereport/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
           pct=$(grep -oiE 'Line coverage: [0-9.]+%' coveragereport/Summary.txt | head -1 | grep -oE '[0-9.]+')
-          # Merged across all three OSes is ~89% (the remainder is untriggerable native error branches).
-          # Start at a safe 80% floor to guard against regressions; tighten once the CI baseline is known.
-          threshold=80
+          # Merged across all three OSes is ~94%. The uncovered remainder is native "throw if the OS
+          # call unexpectedly fails" defensive branches, which can't be exercised without fault
+          # injection into the P/Invoke layer — a compromise this thin-interop library avoids.
+          threshold=90
           echo "Merged line coverage: ${pct}% (threshold ${threshold}%)"
           if awk "BEGIN{ exit !(${pct:-0} >= ${threshold}) }"; then
             echo "Coverage meets the threshold."
