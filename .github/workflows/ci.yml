@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A new push to a ref cancels the previous, still-running run for that ref, so runs don't pile up
+# and compete for scarce runners (notably Intel macOS).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: ${{ matrix.os }} (${{ matrix.rid }})
@@ -16,10 +22,8 @@ jobs:
         include:
           - os: windows-latest
             rid: win-x64
-          - os: macos-latest      # Apple Silicon
+          - os: macos-latest      # Apple Silicon — exercises the same Security.framework P/Invoke as Intel
             rid: osx-arm64
-          - os: macos-13          # Intel
-            rid: osx-x64
           - os: ubuntu-latest
             rid: linux-x64
           - os: ubuntu-24.04-arm
