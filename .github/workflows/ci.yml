@@ -51,8 +51,11 @@ jobs:
       - name: Integration tests (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11
+          # Retry: the ARM package mirror (ports.ubuntu.com) is intermittently unreachable.
+          for attempt in 1 2 3 4 5; do
+            sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11 && break
+            echo "apt attempt ${attempt} failed; retrying in 15s..."; sleep 15
+          done
           # A NON-empty password is required: an empty one makes gnome-keyring try to prompt
           # (confirming unencrypted storage), which fails with no display, so the default
           # "login" collection is never created and every store fails.
@@ -129,8 +132,11 @@ jobs:
       - name: Integration coverage (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11
+          # Retry: the ARM package mirror (ports.ubuntu.com) is intermittently unreachable.
+          for attempt in 1 2 3 4 5; do
+            sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11 && break
+            echo "apt attempt ${attempt} failed; retrying in 15s..."; sleep 15
+          done
           dbus-run-session -- bash -c '
             echo -n "latchkey-ci" | gnome-keyring-daemon --daemonize --unlock --components=secrets
             dotnet run --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release -f net10.0 -- \
