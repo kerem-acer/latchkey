@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+
+    <!-- Hand-marshalled native structs need pointer access. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Zero-dependency, AOT- and trim-clean is the whole value proposition. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+
+    <!-- Packaging. -->
+    <IsPackable>true</IsPackable>
+    <PackageId>Latchkey</PackageId>
+    <Description>Store and retrieve secrets in the OS-native credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service). Pure managed, zero native dependencies, Native-AOT and trim clean.</Description>
+    <PackageTags>secrets;keychain;credentials;keyring;secret-service;credential-manager;dpapi;security;aot</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="\" Condition="Exists('$(MSBuildThisFileDirectory)../../README.md')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Latchkey.Tests" />
+    <InternalsVisibleTo Include="Latchkey.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+</Project>

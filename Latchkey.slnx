@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Latchkey.Benchmarks/Latchkey.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Latchkey.Extensions.DependencyInjection/Latchkey.Extensions.DependencyInjection.csproj" />
+    <Project Path="src/Latchkey/Latchkey.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Latchkey.Extensions.DependencyInjection.Tests/Latchkey.Extensions.DependencyInjection.Tests.csproj" />
+    <Project Path="tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj" />
+    <Project Path="tests/Latchkey.Tests/Latchkey.Tests.csproj" />
+  </Folder>
+</Solution>

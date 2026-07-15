@@ -1,0 +1,202 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest      # Apple Silicon
+            rid: osx-arm64
+          - os: macos-13          # Intel
+            rid: osx-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Unit tests (net8.0 + net10.0)
+        run: dotnet test --project tests/Latchkey.Tests/Latchkey.Tests.csproj -c Release
+
+      # --- Integration tests against the real OS store, per platform ---
+
+      - name: Integration tests (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11
+          # A NON-empty password is required: an empty one makes gnome-keyring try to prompt
+          # (confirming unencrypted storage), which fails with no display, so the default
+          # "login" collection is never created and every store fails.
+          dbus-run-session -- bash -c '
+            echo -n "latchkey-ci" | gnome-keyring-daemon --daemonize --unlock --components=secrets
+            dotnet test --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release'
+
+      - name: Integration tests (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          security create-keychain -p "" latchkey-test.keychain
+          security unlock-keychain -p "" latchkey-test.keychain
+          security list-keychains -d user -s latchkey-test.keychain
+          set +e
+          dotnet test --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release
+          code=$?
+          security delete-keychain latchkey-test.keychain
+          exit $code
+
+      - name: Integration tests (Windows)
+        if: runner.os == 'Windows'
+        run: dotnet test --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release
+
+  # The failure path is a feature: on Linux with no Secret Service, detection must throw a clear,
+  # actionable exception rather than silently falling back to an insecure file.
+  headless-linux:
+    name: Linux without a keyring (asserts unavailable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Assert LatchkeyBackendUnavailableException with no Secret Service
+        env:
+          LATCHKEY_EXPECT_UNAVAILABLE: '1'
+        run: dotnet test --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release
+
+  # Collect coverage natively on each OS (each covers that platform's backend), then merge + gate.
+  coverage:
+    name: Coverage (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, rid: linux-x64 }
+          - { os: macos-latest, rid: osx-arm64 }
+          - { os: windows-latest, rid: win-x64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Unit + DI coverage
+        run: |
+          dotnet run --project tests/Latchkey.Tests/Latchkey.Tests.csproj -c Release -f net10.0 -- \
+            --coverage --coverage-output-format cobertura --coverage-output unit.cobertura.xml
+          dotnet run --project tests/Latchkey.Extensions.DependencyInjection.Tests/Latchkey.Extensions.DependencyInjection.Tests.csproj -c Release -f net10.0 -- \
+            --coverage --coverage-output-format cobertura --coverage-output di.cobertura.xml
+
+      - name: Integration coverage (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11
+          dbus-run-session -- bash -c '
+            echo -n "latchkey-ci" | gnome-keyring-daemon --daemonize --unlock --components=secrets
+            dotnet run --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release -f net10.0 -- \
+              --coverage --coverage-output-format cobertura --coverage-output integ.cobertura.xml'
+
+      - name: Integration coverage (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          security create-keychain -p "" latchkey-test.keychain
+          security unlock-keychain -p "" latchkey-test.keychain
+          security list-keychains -d user -s latchkey-test.keychain
+          set +e
+          dotnet run --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release -f net10.0 -- \
+            --coverage --coverage-output-format cobertura --coverage-output integ.cobertura.xml
+          code=$?
+          security delete-keychain latchkey-test.keychain
+          exit $code
+
+      - name: Integration coverage (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          dotnet run --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release -f net10.0 -- \
+            --coverage --coverage-output-format cobertura --coverage-output integ.cobertura.xml
+
+      - name: Gather cobertura files
+        run: |
+          mkdir -p coverage
+          n=0
+          for f in $(find tests -path '*TestResults*' -name '*.cobertura.xml'); do
+            cp "$f" "coverage/cov-${{ matrix.rid }}-$n.cobertura.xml"
+            n=$((n + 1))
+          done
+          ls -la coverage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.rid }}
+          path: coverage/*.cobertura.xml
+
+  coverage-report:
+    name: Coverage report + gate
+    needs: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: coverage
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: Merge, report, and enforce threshold
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          reportgenerator \
+            "-reports:coverage/*.cobertura.xml" \
+            "-targetdir:coveragereport" \
+            "-reporttypes:TextSummary;MarkdownSummaryGithub" \
+            "-assemblyfilters:+Latchkey*"
+          cat coveragereport/Summary.txt
+          cat coveragereport/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          pct=$(grep -oiE 'Line coverage: [0-9.]+%' coveragereport/Summary.txt | head -1 | grep -oE '[0-9.]+')
+          # Merged across all three OSes is ~89% (the remainder is untriggerable native error branches).
+          # Start at a safe 80% floor to guard against regressions; tighten once the CI baseline is known.
+          threshold=80
+          echo "Merged line coverage: ${pct}% (threshold ${threshold}%)"
+          if awk "BEGIN{ exit !(${pct:-0} >= ${threshold}) }"; then
+            echo "Coverage meets the threshold."
+          else
+            echo "::error::Line coverage ${pct}% is below the ${threshold}% threshold."
+            exit 1
+          fi

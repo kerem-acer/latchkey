@@ -1,0 +1,83 @@
+using Latchkey.Tests.Support;
+
+namespace Latchkey.Tests;
+
+public class ValidationTests
+{
+    private static ILatchkey NewClient() =>
+        LatchkeyFactory.Create(new LatchkeyOptions { ServiceName = "dev.latchkey.test", CustomBackend = new RecordingBackend() });
+
+    [Test]
+    [Arguments("")]
+    [Arguments("   ")]
+    [Arguments("\t")]
+    [Arguments("a\0b")]
+    public async Task Set_RejectsInvalidKey(string key)
+    {
+        var client = NewClient();
+        await Assert.That(() => client.Set(key, "v")).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task Set_RejectsNullKey()
+    {
+        var client = NewClient();
+        await Assert.That(() => client.Set(null!, "v")).Throws<ArgumentNullException>();
+    }
+
+    [Test]
+    public async Task Set_RejectsOverLongKey()
+    {
+        var client = NewClient();
+        var key = new string('k', Validation.MaxKeyLength + 1);
+        await Assert.That(() => client.Set(key, "v")).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task Set_AcceptsKeyAtExactlyMaxLength()
+    {
+        var client = NewClient();
+        var key = new string('k', Validation.MaxKeyLength);
+        client.Set(key, "v");
+        await Assert.That(client.Get(key)).IsEqualTo("v");
+    }
+
+    [Test]
+    [Arguments("simple")]
+    [Arguments("with spaces")]
+    [Arguments("emoji-🔑")]
+    [Arguments("üñïçödé-key")]
+    [Arguments("dev.example.app/token")]
+    public async Task Set_AcceptsValidUnicodeKey(string key)
+    {
+        var client = NewClient();
+        client.Set(key, "v");
+        await Assert.That(client.Get(key)).IsEqualTo("v");
+    }
+
+    [Test]
+    [Arguments("")]
+    [Arguments("   ")]
+    [Arguments("svc\0name")]
+    public async Task Create_RejectsInvalidServiceName(string serviceName)
+    {
+        await Assert.That(() => LatchkeyFactory.Create(serviceName)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task Create_RejectsOverLongServiceName()
+    {
+        var name = new string('s', Validation.MaxServiceNameLength + 1);
+        await Assert.That(() => LatchkeyFactory.Create(name)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task Get_ValidatesKey()
+    {
+        var client = NewClient();
+        await Assert.That(() => client.Get("")).Throws<ArgumentException>();
+        await Assert.That(() => client.GetBytes("")).Throws<ArgumentException>();
+        await Assert.That(() => client.Delete("")).Throws<ArgumentException>();
+        await Assert.That(() => client.Contains("")).Throws<ArgumentException>();
+    }
+}
