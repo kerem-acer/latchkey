@@ -60,6 +60,7 @@ jobs:
           security create-keychain -p "" latchkey-test.keychain
           security unlock-keychain -p "" latchkey-test.keychain
           security list-keychains -d user -s latchkey-test.keychain
+          security default-keychain -s latchkey-test.keychain  # SecItemAdd targets the default keychain; lookups search the list — they must be the same one
           set +e
           dotnet test --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release
           code=$?
@@ -135,6 +136,7 @@ jobs:
           security create-keychain -p "" latchkey-test.keychain
           security unlock-keychain -p "" latchkey-test.keychain
           security list-keychains -d user -s latchkey-test.keychain
+          security default-keychain -s latchkey-test.keychain  # SecItemAdd targets the default keychain; lookups search the list — they must be the same one
           set +e
           dotnet run --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release -f net10.0 -- \
             --coverage --coverage-output-format cobertura --coverage-output integ.cobertura.xml
