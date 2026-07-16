@@ -341,7 +341,7 @@ jobs:
       # token, so skip them rather than fail. Runs before the gate so coverage shows even when it fails.
       - name: Comment coverage on the PR
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: coverage
           path: coveragereport/SummaryGithub.md
