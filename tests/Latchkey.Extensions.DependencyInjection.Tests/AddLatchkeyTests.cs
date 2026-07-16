@@ -1,4 +1,3 @@
-using Latchkey;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -7,69 +6,88 @@ namespace Latchkey.Extensions.DependencyInjection.Tests;
 
 public class AddLatchkeyTests
 {
-    private static ServiceProvider BuildInMemory(string serviceName = "dev.latchkey.test")
+    static ServiceProvider BuildInMemory(string serviceName = "dev.latchkey.test")
     {
         var services = new ServiceCollection();
-        services.AddLatchkey(o =>
+        services.AddLatchkey(_ => new LatchkeyOptions
         {
-            o.ServiceName = serviceName;
-            o.Backend = LatchkeyBackend.InMemory;
+            ServiceName = serviceName,
+            Backend = LatchkeyBackend.InMemory
         });
+
         return services.BuildServiceProvider();
     }
 
     [Test]
-    public async Task Registers_ILatchkey_As_Singleton()
+    public async Task RegistersILatchkeyAsSingleton()
     {
-        using var sp = BuildInMemory();
+        await using var sp = BuildInMemory();
         var a = sp.GetRequiredService<ILatchkey>();
         var b = sp.GetRequiredService<ILatchkey>();
         await Assert.That(ReferenceEquals(a, b)).IsTrue();
     }
 
     [Test]
-    public async Task Resolved_ILatchkey_RoundTrips()
+    public async Task ResolvedILatchkeyRoundTrips()
     {
-        using var sp = BuildInMemory();
+        await using var sp = BuildInMemory();
         var store = sp.GetRequiredService<ILatchkey>();
         store.Set("k", "v");
         await Assert.That(store.Get("k")).IsEqualTo("v");
     }
 
     [Test]
-    public async Task AddLatchkey_Twice_Is_Idempotent()
+    public async Task AddLatchkeyTwiceIsIdempotent()
     {
         var services = new ServiceCollection();
-        services.AddLatchkey(o => { o.ServiceName = "dev.latchkey.test"; o.Backend = LatchkeyBackend.InMemory; });
-        services.AddLatchkey(o => { o.ServiceName = "dev.latchkey.test"; o.Backend = LatchkeyBackend.InMemory; });
+        services.AddLatchkey(_ => new LatchkeyOptions
+        {
+            ServiceName = "dev.latchkey.test",
+            Backend = LatchkeyBackend.InMemory
+        });
 
-        int registrations = services.Count(d => d.ServiceType == typeof(ILatchkey));
+        services.AddLatchkey(_ => new LatchkeyOptions
+        {
+            ServiceName = "dev.latchkey.test",
+            Backend = LatchkeyBackend.InMemory
+        });
+
+        var registrations = services.Count(d => d.ServiceType == typeof(ILatchkey));
         await Assert.That(registrations).IsEqualTo(1);
     }
 
     [Test]
-    public async Task Invalid_ServiceName_Fails_Validation_On_Resolve()
+    public async Task InvalidServiceNameFailsValidationOnResolve()
     {
         var services = new ServiceCollection();
-        services.AddLatchkey(o => { o.ServiceName = "   "; o.Backend = LatchkeyBackend.InMemory; });
+        services.AddLatchkey(_ => new LatchkeyOptions
+        {
+            ServiceName = "   ",
+            Backend = LatchkeyBackend.InMemory
+        });
+
         using var sp = services.BuildServiceProvider();
 
         await Assert.That(() => sp.GetRequiredService<ILatchkey>()).Throws<OptionsValidationException>();
     }
 
     [Test]
-    public async Task Invalid_ServiceName_Fails_Host_StartUp_Via_ValidateOnStart()
+    public async Task InvalidServiceNameFailsHostStartUpViaValidateOnStart()
     {
         using var host = new HostBuilder()
             .ConfigureServices(services =>
-                services.AddLatchkey(o => { o.ServiceName = ""; o.Backend = LatchkeyBackend.InMemory; }))
+                services.AddLatchkey(_ => new LatchkeyOptions
+                {
+                    ServiceName = "",
+                    Backend = LatchkeyBackend.InMemory
+                }))
             .Build();
 
         await Assert.That(async () => await host.StartAsync()).Throws<OptionsValidationException>();
     }
 
     [Test]
-    public async Task Valid_ServiceName_Passes_Validation()
+    public async Task ValidServiceNamePassesValidation()
     {
         using var sp = BuildInMemory("dev.example.myapp");
         var options = sp.GetRequiredService<IOptions<LatchkeyOptions>>().Value;

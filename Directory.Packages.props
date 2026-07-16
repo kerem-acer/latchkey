@@ -1,21 +1,18 @@
 <Project>
-
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
-
   <!-- Testing (TUnit is source-generated; mocking requires C# 14). -->
   <ItemGroup>
+    <PackageVersion Include="CliWrap" Version="3.10.2" />
     <PackageVersion Include="TUnit" Version="1.60.0" />
     <PackageVersion Include="TUnit.Mocks" Version="1.60.0" />
   </ItemGroup>
-
   <!-- Benchmarks. -->
   <ItemGroup>
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
   </ItemGroup>
-
   <!-- DI package only. Pinned to 8.0.x so net8.0 consumers are not forced up. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
@@ -23,13 +20,10 @@
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
   </ItemGroup>
-
   <!-- Test-only: DI container + hosting implementation for the DI package's tests. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
   </ItemGroup>
-
   <!-- Code coverage ships with the TUnit meta package; no reference needed. -->
-
 </Project>

@@ -9,20 +9,12 @@ namespace Latchkey.IntegrationTests;
 public class WindowsIntegrationTests
 {
     [Test]
-    public async Task CredentialManager_Is_The_Selected_Backend()
-    {
-        Integration.RequireWindows();
-        Integration.RequireBackend();
-        await Assert.That(Latchkey.DetectBackend()).IsEqualTo(LatchkeyBackend.WindowsCredentialManager);
-    }
-
-    [Test]
-    public async Task Value_Exactly_At_Blob_Limit_RoundTrips_Through_Real_Store()
+    public async Task ValueExactlyAtBlobLimitRoundTripsThroughRealStore()
     {
         Integration.RequireWindows();
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
         var data = new byte[2560]; // CRED_MAX_CREDENTIAL_BLOB_SIZE
         Random.Shared.NextBytes(data);
@@ -40,26 +32,36 @@ public class WindowsIntegrationTests
     }
 
     [Test]
-    public async Task Value_One_Byte_Over_Limit_Throws_Before_Touching_The_Store()
+    public async Task ValueOneByteOverLimitThrowsBeforeTouchingTheStore()
     {
         Integration.RequireWindows();
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
         var data = new byte[2561];
         await Assert.That(() => store.Set("over", data)).Throws<LatchkeyValueTooLargeException>();
     }
 
     [Test]
-    public async Task Binary_With_Null_Bytes_RoundTrips_As_Raw_Blob()
+    public async Task BinaryWithNullBytesRoundTripsAsRawBlob()
     {
         Integration.RequireWindows();
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
-        byte[] data = { 0x00, 0xFF, 0x00, 0x10, 0x00, 0x7F, 0x00 };
+        byte[] data =
+        [
+            0x00,
+            0xFF,
+            0x00,
+            0x10,
+            0x00,
+            0x7F,
+            0x00
+        ];
+
         try
         {
             store.Set("bin", data);

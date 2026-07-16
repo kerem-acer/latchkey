@@ -2,31 +2,41 @@ namespace Latchkey.Tests;
 
 public class ConcurrencyTests
 {
-    private static ILatchkey NewInMemory() =>
-        LatchkeyFactory.Create(new LatchkeyOptions { ServiceName = "dev.latchkey.test", Backend = LatchkeyBackend.InMemory });
+    static ILatchkey NewInMemory() =>
+        LatchkeyFactory.Create(
+            new LatchkeyOptions
+            {
+                ServiceName = "dev.latchkey.test",
+                Backend = LatchkeyBackend.InMemory
+            });
 
     [Test]
-    public async Task Concurrent_DistinctKeys_NoCorruption()
+    public async Task ConcurrentDistinctKeysNoCorruption()
     {
         var c = NewInMemory();
         const int threads = 16;
         const int perThread = 200;
 
         var tasks = new Task[threads];
-        for (int t = 0; t < threads; t++)
+        for (var t = 0; t < threads; t++)
         {
-            int id = t;
+            var id = t;
             tasks[t] = Task.Run(() =>
             {
-                for (int i = 0; i < perThread; i++)
+                for (var i = 0; i < perThread; i++)
                 {
-                    string key = $"k{id}-{i}";
-                    string val = $"v{id}-{i}";
+                    var key = $"k{id}-{i}";
+                    var val = $"v{id}-{i}";
                     c.Set(key, val);
                     if (c.Get(key) != val)
+                    {
                         throw new InvalidOperationException($"corruption at {key}");
+                    }
+
                     if (!c.Delete(key))
+                    {
                         throw new InvalidOperationException($"missing at delete {key}");
+                    }
                 }
             });
         }
@@ -35,19 +45,19 @@ public class ConcurrencyTests
     }
 
     [Test]
-    public async Task Concurrent_SameKey_LastWriteWins_NoExceptions()
+    public async Task ConcurrentSameKeyLastWriteWinsNoExceptions()
     {
         var c = NewInMemory();
         const int threads = 16;
         const int perThread = 300;
 
         var tasks = new Task[threads];
-        for (int t = 0; t < threads; t++)
+        for (var t = 0; t < threads; t++)
         {
-            int id = t;
+            var id = t;
             tasks[t] = Task.Run(() =>
             {
-                for (int i = 0; i < perThread; i++)
+                for (var i = 0; i < perThread; i++)
                 {
                     c.Set("shared", $"{id}-{i}");
                     _ = c.Get("shared");

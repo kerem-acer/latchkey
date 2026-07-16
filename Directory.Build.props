@@ -8,6 +8,14 @@
     <Deterministic>true</Deterministic>
     <InvariantGlobalization>true</InvariantGlobalization>
 
+    <!-- Adopted from the shared house style (InsurUp/core). -->
+    <NuGetAuditMode>direct</NuGetAuditMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- IDE0330 (prefer System.Threading.Lock) can't be honored while we still target net8.0,
+         where that type doesn't exist. -->
+    <NoWarn>$(NoWarn);IDE0330</NoWarn>
+
     <!-- Not packable by default; the two shipping libraries opt in. -->
     <IsPackable>false</IsPackable>
   </PropertyGroup>

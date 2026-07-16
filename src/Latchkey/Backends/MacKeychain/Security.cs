@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 
-namespace Latchkey.Native;
+namespace Latchkey.Backends.MacKeychain;
 
 /// <summary>P/Invoke surface for the macOS Keychain (Security.framework).</summary>
-internal static partial class Security
+static partial class Security
 {
     internal const string Library = "/System/Library/Frameworks/Security.framework/Security";
 
@@ -12,14 +12,14 @@ internal static partial class Security
     internal const int ErrSecDuplicateItem = -25299;
 
     [LibraryImport(Library)]
-    internal static partial int SecItemAdd(IntPtr attributes, IntPtr result);
+    internal static partial int SecItemAdd(nint attributes, nint result);
 
     [LibraryImport(Library)]
-    internal static partial int SecItemCopyMatching(IntPtr query, out IntPtr result);
+    internal static partial int SecItemCopyMatching(nint query, out nint result);
 
     [LibraryImport(Library)]
-    internal static partial int SecItemUpdate(IntPtr query, IntPtr attributesToUpdate);
+    internal static partial int SecItemUpdate(nint query, nint attributesToUpdate);
 
     [LibraryImport(Library)]
-    internal static partial int SecItemDelete(IntPtr query);
+    internal static partial int SecItemDelete(nint query);
 }

@@ -99,6 +99,111 @@ jobs:
           LATCHKEY_EXPECT_UNAVAILABLE: '1'
         run: dotnet test --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release
 
+  # The pass backend needs a real `pass` store, which needs a GPG key — neither exists on a stock
+  # runner. Set up a throwaway, passphrase-less key, initialise the default store, then run just the
+  # pass suite (with coverage, folded into the gate below). `pass ls` is a preflight gate (fail loudly
+  # if setup broke rather than skip the tests) and --minimum-expected-tests guards against a filter
+  # that silently matches nothing. Runs on both Linux architectures.
+  pass-linux:
+    name: pass backend (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, rid: linux-x64 }
+          - { os: ubuntu-24.04-arm, rid: linux-arm64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Install pass and initialise a throwaway store
+        run: |
+          # Retry: apt mirrors (notably the ARM ports mirror) are intermittently unreachable.
+          for attempt in 1 2 3 4 5; do
+            sudo apt-get update && sudo apt-get install -y pass && break
+            echo "apt attempt ${attempt} failed; retrying in 15s..."; sleep 15
+          done
+          # A passphrase-less key (empty --passphrase under --batch, loopback pinentry) so pass can
+          # encrypt and decrypt with no prompt. The default algorithm includes an encryption subkey,
+          # which is what pass requires; a locally generated key is ultimately trusted, so gpg
+          # encrypts to it without an interactive confirmation.
+          gpg --batch --pinentry-mode loopback --passphrase '' \
+            --quick-generate-key 'Latchkey CI <ci@latchkey.test>'
+          pass init ci@latchkey.test
+          pass ls  # preflight: fails the job if the store is not usable
+
+      - name: Pass integration tests (with coverage)
+        run: |
+          dotnet run --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release -f net10.0 -- \
+            --treenode-filter "/*/*/PassIntegrationTests/*" --minimum-expected-tests 2 \
+            --coverage --coverage-output-format cobertura --coverage-output pass-${{ matrix.rid }}.cobertura.xml
+
+      - name: Gather coverage
+        run: |
+          mkdir -p coverage
+          find tests -path '*TestResults*' -name 'pass-*.cobertura.xml' -exec cp {} coverage/ \;
+          ls -la coverage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-pass-${{ matrix.rid }}
+          path: coverage/*.cobertura.xml
+
+  # systemd-creds host-key sealing needs root to read/create /var/lib/systemd/credential.secret
+  # (GitHub runners have no usable TPM), so this leg runs the suite under sudo. The preflight
+  # seal/unseal round-trip gates the job: if the environment can't seal, fail loudly instead of
+  # letting the test skip, and --minimum-expected-tests guards the filter matching nothing. Coverage
+  # (root-owned) is gathered back to the runner user and folded into the gate below.
+  systemd-creds-linux:
+    name: systemd-creds backend (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, rid: linux-x64 }
+          - { os: ubuntu-24.04-arm, rid: linux-arm64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Preflight — host-key seal/unseal as root
+        run: |
+          systemd-creds --version
+          printf 'preflight' | sudo systemd-creds encrypt --name=latchkey-preflight - - \
+            | sudo systemd-creds decrypt --name=latchkey-preflight - - | grep -q preflight
+
+      - name: systemd-creds integration tests (with coverage)
+        run: |
+          sudo -E env "PATH=$PATH" \
+            dotnet run --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release -f net10.0 -- \
+              --treenode-filter "/*/*/SystemdCredsIntegrationTests/*" --minimum-expected-tests 2 \
+              --coverage --coverage-output-format cobertura --coverage-output sdcreds-${{ matrix.rid }}.cobertura.xml
+
+      - name: Gather coverage
+        run: |
+          mkdir -p coverage
+          # The coverage file was written by the root test process; copy it out and hand it back.
+          sudo find tests -path '*TestResults*' -name 'sdcreds-*.cobertura.xml' -exec cp {} coverage/ \;
+          sudo chown -R "$(id -u):$(id -g)" coverage
+          ls -la coverage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-sdcreds-${{ matrix.rid }}
+          path: coverage/*.cobertura.xml
+
   # Collect coverage natively on each OS (each covers that platform's backend), then merge + gate.
   coverage:
     name: Coverage (${{ matrix.rid }})
@@ -179,7 +284,7 @@ jobs:
 
   coverage-report:
     name: Coverage report + gate
-    needs: coverage
+    needs: [ coverage, pass-linux, systemd-creds-linux ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-dotnet@v4

@@ -1,25 +1,29 @@
 using System.Runtime.InteropServices;
+
 using Microsoft.Win32.SafeHandles;
 
-namespace Latchkey.Native;
+namespace Latchkey.Backends.SecretService;
 
 /// <summary>P/Invoke surface for GLib (GHashTable and GError), used by the Secret Service backend.</summary>
-internal static partial class GLib
+static partial class GLib
 {
     internal const string Library = "libglib-2.0.so.0";
 
     [LibraryImport(Library, EntryPoint = "g_hash_table_new_full")]
-    internal static partial IntPtr g_hash_table_new_full(IntPtr hashFunc, IntPtr keyEqualFunc, IntPtr keyDestroy, IntPtr valueDestroy);
+    internal static partial nint g_hash_table_new_full(nint hashFunc,
+        nint keyEqualFunc,
+        nint keyDestroy,
+        nint valueDestroy);
 
     [LibraryImport(Library, EntryPoint = "g_hash_table_insert")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static partial bool g_hash_table_insert(IntPtr table, IntPtr key, IntPtr value);
+    internal static partial bool g_hash_table_insert(nint table, nint key, nint value);
 
     [LibraryImport(Library, EntryPoint = "g_hash_table_destroy")]
-    internal static partial void g_hash_table_destroy(IntPtr table);
+    internal static partial void g_hash_table_destroy(nint table);
 
     [LibraryImport(Library, EntryPoint = "g_error_free")]
-    internal static partial void g_error_free(IntPtr error);
+    internal static partial void g_error_free(nint error);
 
     /// <summary>
     /// The GError struct. domain (GQuark, 4 bytes) + code (gint, 4 bytes) + message (gchar*),
@@ -35,7 +39,7 @@ internal static partial class GLib
 }
 
 /// <summary>Owns a GError* returned by GLib/libsecret; releases it via <c>g_error_free</c>.</summary>
-internal sealed class SafeGErrorHandle : SafeHandleZeroOrMinusOneIsInvalid
+sealed class SafeGErrorHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
     public SafeGErrorHandle() : base(ownsHandle: true) { }
 

@@ -9,7 +9,7 @@ namespace Latchkey.IntegrationTests;
 public class UnavailableIntegrationTests
 {
     [Test]
-    public async Task Auto_On_Headless_Host_Throws_Actionable_Unavailable()
+    public async Task AutoOnHeadlessHostThrowsActionableUnavailable()
     {
         Integration.RequireExpectUnavailable();
 
@@ -19,14 +19,7 @@ public class UnavailableIntegrationTests
     }
 
     [Test]
-    public async Task DetectBackend_On_Headless_Host_Returns_Null()
-    {
-        Integration.RequireExpectUnavailable();
-        await Assert.That(Latchkey.DetectBackend()).IsNull();
-    }
-
-    [Test]
-    public async Task VerifyPersistence_On_Headless_Host_Returns_False()
+    public async Task VerifyPersistenceOnHeadlessHostReturnsFalse()
     {
         Integration.RequireExpectUnavailable();
         await Assert.That(Latchkey.VerifyPersistence(Integration.UniqueService())).IsFalse();

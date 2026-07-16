@@ -8,11 +8,11 @@ namespace Latchkey.IntegrationTests;
 public class RoundTripIntegrationTests
 {
     [Test]
-    public async Task Full_RoundTrip_Set_Get_Delete()
+    public async Task FullRoundTripSetGetDelete()
     {
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
         try
         {
@@ -28,11 +28,11 @@ public class RoundTripIntegrationTests
     }
 
     [Test]
-    public async Task Overwrite_Upserts()
+    public async Task OverwriteUpserts()
     {
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
         try
         {
@@ -47,21 +47,21 @@ public class RoundTripIntegrationTests
     }
 
     [Test]
-    public async Task Delete_Nonexistent_ReturnsFalse()
+    public async Task DeleteNonexistentReturnsFalse()
     {
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
         await Assert.That(store.Delete("never-set")).IsFalse();
     }
 
     [Test]
-    public async Task Unicode_And_Emoji_RoundTrip()
+    public async Task UnicodeAndEmojiRoundTrip()
     {
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
         const string value = "üñïçödé — 日本語 — 🔐🗝️";
         try
@@ -76,13 +76,24 @@ public class RoundTripIntegrationTests
     }
 
     [Test]
-    public async Task Binary_With_NullBytes_RoundTrips_Via_GetBytes()
+    public async Task BinaryWithNullBytesRoundTripsViaGetBytes()
     {
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
-        byte[] data = { 0x00, 0x01, 0xFF, 0x00, 0x7F, 0x00, 0x80, 0xAB };
+        byte[] data =
+        [
+            0x00,
+            0x01,
+            0xFF,
+            0x00,
+            0x7F,
+            0x00,
+            0x80,
+            0xAB
+        ];
+
         try
         {
             store.Set("k", data);
@@ -97,15 +108,15 @@ public class RoundTripIntegrationTests
     }
 
     [Test]
-    public async Task Empty_Value_RoundTrips()
+    public async Task EmptyValueRoundTrips()
     {
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var store = LatchkeyFactory.Create(service);
         try
         {
-            store.Set("empty", ReadOnlySpan<byte>.Empty);
+            store.Set("empty", []);
             var read = store.GetBytes("empty");
             await Assert.That(read).IsNotNull();
             await Assert.That(read!.Length).IsEqualTo(0);
@@ -117,14 +128,7 @@ public class RoundTripIntegrationTests
     }
 
     [Test]
-    public async Task DetectBackend_Returns_Expected_For_This_OS()
-    {
-        Integration.RequireBackend();
-        await Assert.That(Latchkey.DetectBackend()).IsEqualTo(Integration.ExpectedBackend());
-    }
-
-    [Test]
-    public async Task VerifyPersistence_Returns_True()
+    public async Task VerifyPersistenceReturnsTrue()
     {
         Integration.RequireBackend();
         await Assert.That(Latchkey.VerifyPersistence(Integration.UniqueService())).IsTrue();

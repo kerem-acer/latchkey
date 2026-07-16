@@ -1,36 +1,38 @@
 using System.Runtime.InteropServices;
-using Latchkey.Native;
 
-namespace Latchkey;
+namespace Latchkey.Backends.MacKeychain;
 
 /// <summary>
 /// Stores secrets in the macOS Keychain as generic passwords via Security.framework. Values are
 /// raw bytes in a CFData — no encoding layer. Upsert is SecItemAdd, falling back to SecItemUpdate
 /// on a duplicate so ACLs are preserved (never delete-then-add).
 /// </summary>
-internal sealed unsafe class MacKeychainBackend : ISecretBackend
+sealed unsafe class MacKeychainBackend : ISecretBackend
 {
-    private static readonly object InitLock = new();
-    private static bool _initialized;
-    private static bool _available;
+    static readonly object InitLock = new();
+    static bool _initialized;
+    static bool _available;
 
     // Resolved once from the loaded frameworks. kSec* are exported CFStringRef symbols; the
     // dictionary callbacks are exported structs whose address we pass straight through.
-    private static IntPtr _keyCallBacks;
-    private static IntPtr _valueCallBacks;
-    private static IntPtr _cfBooleanTrue;
-    private static IntPtr _secClass;
-    private static IntPtr _secClassGenericPassword;
-    private static IntPtr _secAttrService;
-    private static IntPtr _secAttrAccount;
-    private static IntPtr _secValueData;
-    private static IntPtr _secReturnData;
-    private static IntPtr _secMatchLimit;
-    private static IntPtr _secMatchLimitOne;
+    static nint _keyCallBacks;
+    static nint _valueCallBacks;
+    static nint _cfBooleanTrue;
+    static nint _secClass;
+    static nint _secClassGenericPassword;
+    static nint _secAttrService;
+    static nint _secAttrAccount;
+    static nint _secValueData;
+    static nint _secReturnData;
+    static nint _secMatchLimit;
+    static nint _secMatchLimitOne;
 
     public bool IsAvailable => TryInit();
 
-    public void Store(string service, string key, ReadOnlySpan<byte> value, string label)
+    public void Store(string service,
+        string key,
+        ReadOnlySpan<byte> value,
+        string label)
     {
         EnsureAvailable();
 
@@ -39,28 +41,30 @@ internal sealed unsafe class MacKeychainBackend : ISecretBackend
         using var data = CFData(value);
         using var attributes = CreateDictionary();
 
-        IntPtr attrs = attributes.DangerousGetHandle();
+        var attrs = attributes.DangerousGetHandle();
         CoreFoundation.CFDictionarySetValue(attrs, _secClass, _secClassGenericPassword);
         CoreFoundation.CFDictionarySetValue(attrs, _secAttrService, svc.DangerousGetHandle());
         CoreFoundation.CFDictionarySetValue(attrs, _secAttrAccount, acct.DangerousGetHandle());
         CoreFoundation.CFDictionarySetValue(attrs, _secValueData, data.DangerousGetHandle());
 
-        int status = Security.SecItemAdd(attrs, IntPtr.Zero);
+        var status = Security.SecItemAdd(attrs, nint.Zero);
         if (status == Security.ErrSecDuplicateItem)
         {
             using var query = CreateDictionary();
-            IntPtr q = query.DangerousGetHandle();
+            var q = query.DangerousGetHandle();
             CoreFoundation.CFDictionarySetValue(q, _secClass, _secClassGenericPassword);
             CoreFoundation.CFDictionarySetValue(q, _secAttrService, svc.DangerousGetHandle());
             CoreFoundation.CFDictionarySetValue(q, _secAttrAccount, acct.DangerousGetHandle());
 
             using var changes = CreateDictionary();
-            IntPtr ch = changes.DangerousGetHandle();
+            var ch = changes.DangerousGetHandle();
             CoreFoundation.CFDictionarySetValue(ch, _secValueData, data.DangerousGetHandle());
 
             status = Security.SecItemUpdate(q, ch);
             if (status != Security.ErrSecSuccess)
+            {
                 throw new LatchkeyException($"SecItemUpdate failed (OSStatus {status}).");
+            }
         }
         else if (status != Security.ErrSecSuccess)
         {
@@ -76,26 +80,39 @@ internal sealed unsafe class MacKeychainBackend : ISecretBackend
         using var acct = CFString(key);
         using var query = CreateDictionary();
 
-        IntPtr q = query.DangerousGetHandle();
+        var q = query.DangerousGetHandle();
         CoreFoundation.CFDictionarySetValue(q, _secClass, _secClassGenericPassword);
         CoreFoundation.CFDictionarySetValue(q, _secAttrService, svc.DangerousGetHandle());
         CoreFoundation.CFDictionarySetValue(q, _secAttrAccount, acct.DangerousGetHandle());
         CoreFoundation.CFDictionarySetValue(q, _secReturnData, _cfBooleanTrue);
         CoreFoundation.CFDictionarySetValue(q, _secMatchLimit, _secMatchLimitOne);
 
-        int status = Security.SecItemCopyMatching(q, out IntPtr result);
+        var status = Security.SecItemCopyMatching(q, out var result);
         if (status == Security.ErrSecItemNotFound)
+        {
             return null;
+        }
+
         if (status != Security.ErrSecSuccess)
+        {
             throw new LatchkeyException($"SecItemCopyMatching failed (OSStatus {status}).");
+        }
 
         using var data = new SafeCFTypeHandle(result);
-        int length = (int)CoreFoundation.CFDataGetLength(result);
+        var length = (int)CoreFoundation.CFDataGetLength(result);
         if (length == 0)
-            return [];
+        {
+            return
+                [];
+        }
 
         var bytes = new byte[length];
-        Marshal.Copy(CoreFoundation.CFDataGetBytePtr(result), bytes, 0, length);
+        Marshal.Copy(
+            CoreFoundation.CFDataGetBytePtr(result),
+            bytes,
+            0,
+            length);
+
         return bytes;
     }
 
@@ -107,34 +124,46 @@ internal sealed unsafe class MacKeychainBackend : ISecretBackend
         using var acct = CFString(key);
         using var query = CreateDictionary();
 
-        IntPtr q = query.DangerousGetHandle();
+        var q = query.DangerousGetHandle();
         CoreFoundation.CFDictionarySetValue(q, _secClass, _secClassGenericPassword);
         CoreFoundation.CFDictionarySetValue(q, _secAttrService, svc.DangerousGetHandle());
         CoreFoundation.CFDictionarySetValue(q, _secAttrAccount, acct.DangerousGetHandle());
 
-        int status = Security.SecItemDelete(q);
+        var status = Security.SecItemDelete(q);
         if (status == Security.ErrSecItemNotFound)
+        {
             return false;
+        }
+
         if (status == Security.ErrSecSuccess)
+        {
             return true;
+        }
+
         throw new LatchkeyException($"SecItemDelete failed (OSStatus {status}).");
     }
 
-    private void EnsureAvailable()
+    void EnsureAvailable()
     {
         if (!TryInit())
+        {
             throw new LatchkeyBackendUnavailableException(BackendSelector.UnavailableMessage(LatchkeyBackend.MacOSKeychain));
+        }
     }
 
-    private static bool TryInit()
+    static bool TryInit()
     {
         if (_initialized)
+        {
             return _available;
+        }
 
         lock (InitLock)
         {
             if (_initialized)
+            {
                 return _available;
+            }
 
             try
             {
@@ -169,25 +198,36 @@ internal sealed unsafe class MacKeychainBackend : ISecretBackend
         }
     }
 
-    private static IntPtr Deref(IntPtr library, string symbol) =>
+    static nint Deref(nint library, string symbol) =>
         Marshal.ReadIntPtr(NativeLibrary.GetExport(library, symbol));
 
-    private static SafeCFTypeHandle CreateDictionary()
+    static SafeCFTypeHandle CreateDictionary()
     {
-        IntPtr dict = CoreFoundation.CFDictionaryCreateMutable(IntPtr.Zero, 0, _keyCallBacks, _valueCallBacks);
-        if (dict == IntPtr.Zero)
+        var dict = CoreFoundation.CFDictionaryCreateMutable(
+            nint.Zero,
+            0,
+            _keyCallBacks,
+            _valueCallBacks);
+
+        if (dict == nint.Zero)
+        {
             throw new LatchkeyException("CFDictionaryCreateMutable returned null.");
+        }
+
         return new SafeCFTypeHandle(dict);
     }
 
-    private static SafeCFTypeHandle CFString(string value)
+    static SafeCFTypeHandle CFString(string value)
     {
-        IntPtr cString = Marshal.StringToCoTaskMemUTF8(value);
+        var cString = Marshal.StringToCoTaskMemUTF8(value);
         try
         {
-            IntPtr cf = CoreFoundation.CFStringCreateWithCString(IntPtr.Zero, cString, CoreFoundation.KCFStringEncodingUTF8);
-            if (cf == IntPtr.Zero)
+            var cf = CoreFoundation.CFStringCreateWithCString(nint.Zero, cString, CoreFoundation.KCFStringEncodingUTF8);
+            if (cf == nint.Zero)
+            {
                 throw new LatchkeyException("CFStringCreateWithCString returned null.");
+            }
+
             return new SafeCFTypeHandle(cf);
         }
         finally
@@ -196,13 +236,16 @@ internal sealed unsafe class MacKeychainBackend : ISecretBackend
         }
     }
 
-    private static SafeCFTypeHandle CFData(ReadOnlySpan<byte> value)
+    static SafeCFTypeHandle CFData(ReadOnlySpan<byte> value)
     {
         fixed (byte* p = value)
         {
-            IntPtr cf = CoreFoundation.CFDataCreate(IntPtr.Zero, (IntPtr)p, value.Length);
-            if (cf == IntPtr.Zero)
+            var cf = CoreFoundation.CFDataCreate(nint.Zero, (nint)p, value.Length);
+            if (cf == nint.Zero)
+            {
                 throw new LatchkeyException("CFDataCreate returned null.");
+            }
+
             return new SafeCFTypeHandle(cf);
         }
     }

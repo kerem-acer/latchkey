@@ -1,36 +1,60 @@
-using Latchkey;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Latchkey.Extensions.DependencyInjection;
 
 /// <summary>Registers Latchkey with a dependency-injection container.</summary>
 public static class LatchkeyServiceCollectionExtensions
 {
-    /// <summary>Registers <see cref="ILatchkey"/> as a singleton for the given service name.</summary>
+    /// <summary>Registers <see cref="ILatchkey" /> as a singleton for the given service name.</summary>
     public static IServiceCollection AddLatchkey(this IServiceCollection services, string serviceName)
     {
         ArgumentNullException.ThrowIfNull(services);
-        return services.AddLatchkey(options => options.ServiceName = serviceName);
+        return services.AddLatchkey(_ => new LatchkeyOptions
+        {
+            ServiceName = serviceName
+        });
     }
 
-    /// <summary>Registers <see cref="ILatchkey"/> as a singleton, configuring options inline.</summary>
-    public static IServiceCollection AddLatchkey(this IServiceCollection services, Action<LatchkeyOptions> configure)
+    /// <summary>Registers <see cref="ILatchkey" /> as a singleton from a prebuilt <see cref="LatchkeyOptions" />.</summary>
+    public static IServiceCollection AddLatchkey(this IServiceCollection services, LatchkeyOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
+        return services.AddLatchkey(_ => options);
+    }
+
+    /// <summary>
+    /// Registers <see cref="ILatchkey" /> as a singleton, building <see cref="LatchkeyOptions" /> from the
+    /// service provider. Options are immutable, so they are <b>constructed</b> here (e.g.
+    /// <c>sp =&gt; new LatchkeyOptions { ServiceName = "..." }</c>), not mutated.
+    /// </summary>
+    public static IServiceCollection AddLatchkey(this IServiceCollection services, Func<IServiceProvider, LatchkeyOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
-        services.AddOptions<LatchkeyOptions>().Configure(configure);
+
+        // Build the options through a custom OptionsFactory so IOptions<>, ValidateOnStart, and
+        // OptionsValidationException all keep working without mutating the (init-only) options.
+        services.TryAddSingleton<IOptionsFactory<LatchkeyOptions>>(sp => new LatchkeyOptionsFactory(
+            () => configure(sp),
+            sp.GetServices<IConfigureOptions<LatchkeyOptions>>(),
+            sp.GetServices<IPostConfigureOptions<LatchkeyOptions>>(),
+            sp.GetServices<IValidateOptions<LatchkeyOptions>>()));
+
         return AddCore(services);
     }
 
     /// <summary>
-    /// Registers <see cref="ILatchkey"/> as a singleton, expecting <see cref="LatchkeyOptions"/> to be
-    /// configured elsewhere — e.g. <c>services.Configure&lt;LatchkeyOptions&gt;(config.GetSection("Latchkey"))</c>.
+    /// Registers <see cref="ILatchkey" /> as a singleton, expecting <see cref="LatchkeyOptions" /> to be
+    /// configured elsewhere by binding — e.g.
+    /// <c>services.Configure&lt;LatchkeyOptions&gt;(config.GetSection("Latchkey"))</c> (the configuration
+    /// binder assigns init-only properties fine).
     /// </summary>
     public static IServiceCollection AddLatchkey(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        services.AddOptions<LatchkeyOptions>();
         return AddCore(services);
     }
 
@@ -45,16 +69,31 @@ public static class LatchkeyServiceCollectionExtensions
         return services;
     }
 
-    private static IServiceCollection AddCore(IServiceCollection services)
+    static IServiceCollection AddCore(IServiceCollection services)
     {
-        // Validate ServiceName at startup rather than at first Get.
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<LatchkeyOptions>, LatchkeyOptionsValidator>());
+        // Validate at startup rather than at first Get.
         services.AddOptions<LatchkeyOptions>().ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<LatchkeyOptions>, LatchkeyOptionsValidator>());
 
         // Thread-safe and stateless beyond config, so a singleton is correct.
-        services.TryAddSingleton<ILatchkey>(static sp =>
+        services.TryAddSingleton(static sp =>
             LatchkeyFactory.Create(sp.GetRequiredService<IOptions<LatchkeyOptions>>().Value));
 
         return services;
     }
+}
+
+/// <summary>
+/// An <see cref="OptionsFactory{TOptions}" /> that <b>constructs</b> the options via a delegate rather
+/// than mutating a new instance — required because <see cref="LatchkeyOptions" /> is init-only. Configure
+/// / post-configure / validate all still run, so the Options pipeline behaves normally.
+/// </summary>
+sealed class LatchkeyOptionsFactory(
+    Func<LatchkeyOptions> create,
+    IEnumerable<IConfigureOptions<LatchkeyOptions>> setups,
+    IEnumerable<IPostConfigureOptions<LatchkeyOptions>> postConfigures,
+    IEnumerable<IValidateOptions<LatchkeyOptions>> validations)
+    : OptionsFactory<LatchkeyOptions>(setups, postConfigures, validations)
+{
+    protected override LatchkeyOptions CreateInstance(string name) => create();
 }

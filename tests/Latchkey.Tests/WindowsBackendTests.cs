@@ -1,3 +1,5 @@
+using Latchkey.Backends.WindowsCredential;
+
 namespace Latchkey.Tests;
 
 /// <summary>
@@ -7,7 +9,7 @@ namespace Latchkey.Tests;
 public class WindowsBackendTests
 {
     [Test]
-    public async Task EnsureBlobFits_AtLimit_DoesNotThrow()
+    public async Task EnsureBlobFitsAtLimitDoesNotThrow()
     {
         Exception? caught = null;
         try
@@ -23,26 +25,34 @@ public class WindowsBackendTests
     }
 
     [Test]
-    public async Task EnsureBlobFits_OverLimit_Throws()
-    {
+    public async Task EnsureBlobFitsOverLimitThrows() =>
         await Assert.That(() => WindowsCredentialBackend.EnsureBlobFits(WindowsCredentialBackend.MaxBlobSize + 1))
             .Throws<LatchkeyValueTooLargeException>();
-    }
 
     [Test]
-    public async Task Store_OverLimit_Throws_TooLarge_Before_Any_PInvoke()
+    public async Task StoreOverLimitThrowsTooLargeBeforeAnyPInvoke()
     {
         var backend = new WindowsCredentialBackend();
         var oversized = new byte[WindowsCredentialBackend.MaxBlobSize + 1];
-        await Assert.That(() => backend.Store("dev.latchkey.test", "k", oversized, "label"))
+        await Assert.That(() => backend.Store(
+                "dev.latchkey.test",
+                "k",
+                oversized,
+                "label"))
             .Throws<LatchkeyValueTooLargeException>();
     }
 
     [Test]
-    public async Task Other_Backends_Have_No_Size_Limit()
+    public async Task OtherBackendsHaveNoSizeLimit()
     {
         // InMemory (and by extension mac/linux) accept values well past the Windows cap.
-        var c = LatchkeyFactory.Create(new LatchkeyOptions { ServiceName = "dev.latchkey.test", Backend = LatchkeyBackend.InMemory });
+        var c = LatchkeyFactory.Create(
+            new LatchkeyOptions
+            {
+                ServiceName = "dev.latchkey.test",
+                Backend = LatchkeyBackend.InMemory
+            });
+
         var big = new byte[WindowsCredentialBackend.MaxBlobSize * 2];
         big[^1] = 0x42;
         c.Set("k", big);
@@ -51,8 +61,5 @@ public class WindowsBackendTests
     }
 
     [Test]
-    public async Task TargetName_Is_Latchkey_Service_Key()
-    {
-        await Assert.That(WindowsCredentialBackend.TargetName("dev.app", "token")).IsEqualTo("Latchkey:dev.app:token");
-    }
+    public async Task TargetNameIsLatchkeyServiceKey() => await Assert.That(WindowsCredentialBackend.TargetName("dev.app", "token")).IsEqualTo("Latchkey:dev.app:token");
 }

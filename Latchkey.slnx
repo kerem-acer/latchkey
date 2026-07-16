@@ -1,7 +1,4 @@
 <Solution>
-  <Folder Name="/benchmarks/">
-    <Project Path="benchmarks/Latchkey.Benchmarks/Latchkey.Benchmarks.csproj" />
-  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Latchkey.Extensions.DependencyInjection/Latchkey.Extensions.DependencyInjection.csproj" />
     <Project Path="src/Latchkey/Latchkey.csproj" />

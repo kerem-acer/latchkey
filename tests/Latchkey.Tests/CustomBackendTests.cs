@@ -5,16 +5,17 @@ namespace Latchkey.Tests;
 public class CustomBackendTests
 {
     [Test]
-    public async Task CustomBackend_Overrides_Backend_Enum_And_All_Calls_Land_On_It()
+    public async Task CustomBackendOverridesBackendEnumAndAllCallsLandOnIt()
     {
         var backend = new RecordingBackend();
         // Backend is explicitly a native one, but CustomBackend must win with no probe.
-        var c = LatchkeyFactory.Create(new LatchkeyOptions
-        {
-            ServiceName = "dev.latchkey.test",
-            Backend = LatchkeyBackend.WindowsCredentialManager,
-            CustomBackend = backend,
-        });
+        var c = LatchkeyFactory.Create(
+            new LatchkeyOptions
+            {
+                ServiceName = "dev.latchkey.test",
+                Backend = LatchkeyBackend.WindowsCredentialManager,
+                CustomBackend = backend
+            });
 
         c.Set("k", "v");
         var value = c.Get("k");
@@ -28,16 +29,17 @@ public class CustomBackendTests
     }
 
     [Test]
-    public async Task CustomBackend_Used_Even_When_Native_Would_Be_Unavailable()
+    public async Task CustomBackendUsedEvenWhenNativeWouldBeUnavailable()
     {
         // A native backend foreign to this OS would throw during detection; CustomBackend skips that.
         var backend = new RecordingBackend();
-        var c = LatchkeyFactory.Create(new LatchkeyOptions
-        {
-            ServiceName = "dev.latchkey.test",
-            Backend = LatchkeyBackend.SecretService,
-            CustomBackend = backend,
-        });
+        var c = LatchkeyFactory.Create(
+            new LatchkeyOptions
+            {
+                ServiceName = "dev.latchkey.test",
+                Backend = LatchkeyBackend.SecretService,
+                CustomBackend = backend
+            });
 
         c.Set("k", "v");
         await Assert.That(c.Get("k")).IsEqualTo("v");

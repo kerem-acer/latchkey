@@ -1,3 +1,5 @@
+using Latchkey.Backends.SecretService;
+
 namespace Latchkey.Tests;
 
 /// <summary>
@@ -8,9 +10,20 @@ namespace Latchkey.Tests;
 public class SecretServiceCodecTests
 {
     [Test]
-    public async Task Encode_Then_Decode_RoundTrips_Binary_With_NullBytes()
+    public async Task EncodeThenDecodeRoundTripsBinaryWithNullBytes()
     {
-        byte[] data = { 0x00, 0x01, 0xFF, 0x00, 0x7F, 0x00, 0x80, 0x00 };
+        byte[] data =
+        [
+            0x00,
+            0x01,
+            0xFF,
+            0x00,
+            0x7F,
+            0x00,
+            0x80,
+            0x00
+        ];
+
         var encoded = SecretServiceCodec.Encode(data);
 
         // The encoded form is NUL-free ASCII, so libsecret cannot truncate it.
@@ -21,18 +34,16 @@ public class SecretServiceCodecTests
     }
 
     [Test]
-    public async Task Encode_Empty_RoundTrips()
+    public async Task EncodeEmptyRoundTrips()
     {
-        var encoded = SecretServiceCodec.Encode(ReadOnlySpan<byte>.Empty);
+        var encoded = SecretServiceCodec.Encode([]);
         var decoded = SecretServiceCodec.Decode(encoded);
         await Assert.That(decoded.Length).IsEqualTo(0);
     }
 
     [Test]
-    public async Task Decode_ForeignNonBase64_Throws_Rather_Than_Returning_Mojibake()
-    {
+    public async Task DecodeForeignNonBase64ThrowsRatherThanReturningMojibake() =>
         // A plaintext value written by another tool is not valid base64.
         await Assert.That(() => SecretServiceCodec.Decode("hello world not base64!"))
             .Throws<LatchkeyException>();
-    }
 }

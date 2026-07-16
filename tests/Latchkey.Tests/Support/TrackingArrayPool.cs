@@ -3,12 +3,12 @@ using System.Buffers;
 namespace Latchkey.Tests.Support;
 
 /// <summary>
-/// An <see cref="ArrayPool{T}"/> that records, at return time, whether each buffer was fully
+/// An <see cref="ArrayPool{T}" /> that records, at return time, whether each buffer was fully
 /// zeroed. Lets tests prove that secret-bearing pooled buffers are wiped before being returned.
 /// </summary>
-internal sealed class TrackingArrayPool : ArrayPool<byte>
+sealed class TrackingArrayPool : ArrayPool<byte>
 {
-    private readonly ArrayPool<byte> _inner = Shared;
+    readonly ArrayPool<byte> _inner = Shared;
 
     public int RentCount;
     public int ReturnCount;
@@ -29,8 +29,8 @@ internal sealed class TrackingArrayPool : ArrayPool<byte>
     {
         ReturnCount++;
 
-        bool zeroed = true;
-        for (int i = 0; i < array.Length; i++)
+        var zeroed = true;
+        for (var i = 0; i < array.Length; i++)
         {
             if (array[i] != 0)
             {
@@ -40,7 +40,9 @@ internal sealed class TrackingArrayPool : ArrayPool<byte>
         }
 
         if (!zeroed)
+        {
             AllReturnedBuffersWereZeroed = false;
+        }
 
         _inner.Return(array, clearArray);
     }
