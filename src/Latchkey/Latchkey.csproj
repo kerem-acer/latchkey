@@ -15,8 +15,8 @@
     <!-- Packaging. -->
     <IsPackable>true</IsPackable>
     <PackageId>Latchkey</PackageId>
-    <Description>Store and retrieve secrets in the OS-native credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service). Pure managed, zero native dependencies, Native-AOT and trim clean.</Description>
-    <PackageTags>secrets;keychain;credentials;keyring;secret-service;credential-manager;dpapi;security;aot</PackageTags>
+    <Description>Store and retrieve secrets in the OS-native credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service), with opt-in file, DPAPI, pass, and systemd-creds backends and sync + async APIs. Pure managed, zero native dependencies, Native-AOT and trim clean.</Description>
+    <PackageTags>secrets;keychain;credentials;keyring;secret-service;credential-manager;dpapi;pass;systemd-creds;security;aot</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
@@ -27,6 +27,10 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Latchkey.Tests" />
     <InternalsVisibleTo Include="Latchkey.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CliWrap" />
   </ItemGroup>
 
 </Project>

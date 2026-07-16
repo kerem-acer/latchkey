@@ -1,20 +1,27 @@
+using System.Text;
+
 using Latchkey.Tests.Support;
 
 namespace Latchkey.Tests;
 
 public class RoundTripTests
 {
-    private static ILatchkey NewInMemory() =>
-        LatchkeyFactory.Create(new LatchkeyOptions { ServiceName = "dev.latchkey.test", Backend = LatchkeyBackend.InMemory });
+    static ILatchkey NewInMemory() =>
+        LatchkeyFactory.Create(
+            new LatchkeyOptions
+            {
+                ServiceName = "dev.latchkey.test",
+                Backend = LatchkeyBackend.InMemory
+            });
 
     [Test]
     [Arguments("ascii value")]
-    [Arguments("")]                     // empty string
-    [Arguments("a")]                    // 1 byte
-    [Arguments("üñïçödé")]              // multi-byte unicode
-    [Arguments("emoji 🔐🗝️ mix")]      // surrogate pairs
-    [Arguments("line1\nline2\r\nline3")]// embedded newlines
-    public async Task String_RoundTrips(string value)
+    [Arguments("")] // empty string
+    [Arguments("a")] // 1 byte
+    [Arguments("üñïçödé")] // multi-byte unicode
+    [Arguments("emoji 🔐🗝️ mix")] // surrogate pairs
+    [Arguments("line1\nline2\r\nline3")] // embedded newlines
+    public async Task StringRoundTrips(string value)
     {
         var c = NewInMemory();
         c.Set("k", value);
@@ -22,7 +29,7 @@ public class RoundTripTests
     }
 
     [Test]
-    public async Task Get_MissingKey_ReturnsNull_DoesNotThrow()
+    public async Task GetMissingKeyReturnsNullDoesNotThrow()
     {
         var c = NewInMemory();
         await Assert.That(c.Get("missing")).IsNull();
@@ -30,14 +37,14 @@ public class RoundTripTests
     }
 
     [Test]
-    public async Task Delete_MissingKey_ReturnsFalse()
+    public async Task DeleteMissingKeyReturnsFalse()
     {
         var c = NewInMemory();
         await Assert.That(c.Delete("missing")).IsFalse();
     }
 
     [Test]
-    public async Task Delete_ExistingKey_ReturnsTrue_ThenGone()
+    public async Task DeleteExistingKeyReturnsTrueThenGone()
     {
         var c = NewInMemory();
         c.Set("k", "v");
@@ -46,7 +53,7 @@ public class RoundTripTests
     }
 
     [Test]
-    public async Task Contains_Reflects_State()
+    public async Task ContainsReflectsState()
     {
         var c = NewInMemory();
         await Assert.That(c.Contains("k")).IsFalse();
@@ -57,24 +64,39 @@ public class RoundTripTests
     }
 
     [Test]
-    public async Task Set_Twice_Upserts_NoDuplicate()
+    public async Task SetTwiceUpsertsNoDuplicate()
     {
         var backend = new RecordingBackend();
-        var c = LatchkeyFactory.Create(new LatchkeyOptions { ServiceName = "dev.latchkey.test", CustomBackend = backend });
+        var c = LatchkeyFactory.Create(
+            new LatchkeyOptions
+            {
+                ServiceName = "dev.latchkey.test",
+                CustomBackend = backend
+            });
 
         c.Set("k", "first");
         c.Set("k", "second");
 
         await Assert.That(backend.StoreCalls).IsEqualTo(2); // exactly one Store per Set
-        await Assert.That(backend.Count).IsEqualTo(1);       // no duplicate entry
+        await Assert.That(backend.Count).IsEqualTo(1); // no duplicate entry
         await Assert.That(c.Get("k")).IsEqualTo("second");
     }
 
     [Test]
-    public async Task Binary_WithNullBytes_RoundTrips_ViaGetBytes()
+    public async Task BinaryWithNullBytesRoundTripsViaGetBytes()
     {
         var c = NewInMemory();
-        byte[] data = { 0x00, 0x01, 0xFF, 0x00, 0x7F, 0x00, 0x80 };
+        byte[] data =
+        [
+            0x00,
+            0x01,
+            0xFF,
+            0x00,
+            0x7F,
+            0x00,
+            0x80
+        ];
+
         c.Set("k", data);
 
         var read = c.GetBytes("k");
@@ -83,26 +105,44 @@ public class RoundTripTests
     }
 
     [Test]
-    public async Task Client_Hands_RawBytes_To_Backend_Unencoded()
+    public async Task ClientHandsRawBytesToBackendUnencoded()
     {
         // The client must not encode; base64 is a Linux-backend concern only.
         var backend = new RecordingBackend();
-        var c = LatchkeyFactory.Create(new LatchkeyOptions { ServiceName = "dev.latchkey.test", CustomBackend = backend });
+        var c = LatchkeyFactory.Create(
+            new LatchkeyOptions
+            {
+                ServiceName = "dev.latchkey.test",
+                CustomBackend = backend
+            });
 
-        byte[] data = { 0x00, 0x10, 0x00, 0xAB, 0xCD };
+        byte[] data =
+        [
+            0x00,
+            0x10,
+            0x00,
+            0xAB,
+            0xCD
+        ];
+
         c.Set("k", data);
 
         await Assert.That(backend.LastStoredValue!.SequenceEqual(data)).IsTrue();
     }
 
     [Test]
-    public async Task Set_String_Passes_Utf8_Bytes_To_Backend()
+    public async Task SetStringPassesUtf8BytesToBackend()
     {
         var backend = new RecordingBackend();
-        var c = LatchkeyFactory.Create(new LatchkeyOptions { ServiceName = "dev.latchkey.test", CustomBackend = backend });
+        var c = LatchkeyFactory.Create(
+            new LatchkeyOptions
+            {
+                ServiceName = "dev.latchkey.test",
+                CustomBackend = backend
+            });
 
         c.Set("k", "héllo");
-        var expected = System.Text.Encoding.UTF8.GetBytes("héllo");
+        var expected = Encoding.UTF8.GetBytes("héllo");
         await Assert.That(backend.LastStoredValue!.SequenceEqual(expected)).IsTrue();
     }
 }

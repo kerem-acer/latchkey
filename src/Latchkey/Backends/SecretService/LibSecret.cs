@@ -1,13 +1,14 @@
 using System.Runtime.InteropServices;
+
 using Microsoft.Win32.SafeHandles;
 
-namespace Latchkey.Native;
+namespace Latchkey.Backends.SecretService;
 
 /// <summary>
 /// P/Invoke surface for libsecret. Only the non-varargs (<c>*v</c>) sync variants are used; the
 /// varargs forms do not marshal reliably from C#.
 /// </summary>
-internal static partial class LibSecret
+static partial class LibSecret
 {
     internal const string Library = "libsecret-1.so.0";
 
@@ -20,35 +21,35 @@ internal static partial class LibSecret
     [LibraryImport(Library, EntryPoint = "secret_password_storev_sync", StringMarshalling = StringMarshalling.Utf8)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool secret_password_storev_sync(
-        IntPtr schema,
-        IntPtr attributes,
+        nint schema,
+        nint attributes,
         string? collection,
         string label,
         string password,
-        IntPtr cancellable,
+        nint cancellable,
         out SafeGErrorHandle error);
 
     [LibraryImport(Library, EntryPoint = "secret_password_lookupv_sync")]
     internal static partial SafePasswordHandle secret_password_lookupv_sync(
-        IntPtr schema,
-        IntPtr attributes,
-        IntPtr cancellable,
+        nint schema,
+        nint attributes,
+        nint cancellable,
         out SafeGErrorHandle error);
 
     [LibraryImport(Library, EntryPoint = "secret_password_clearv_sync")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool secret_password_clearv_sync(
-        IntPtr schema,
-        IntPtr attributes,
-        IntPtr cancellable,
+        nint schema,
+        nint attributes,
+        nint cancellable,
         out SafeGErrorHandle error);
 
     [LibraryImport(Library, EntryPoint = "secret_password_free")]
-    internal static partial void secret_password_free(IntPtr password);
+    internal static partial void secret_password_free(nint password);
 }
 
 /// <summary>Owns a password string returned by libsecret; releases it via <c>secret_password_free</c>.</summary>
-internal sealed class SafePasswordHandle : SafeHandleZeroOrMinusOneIsInvalid
+sealed class SafePasswordHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
     public SafePasswordHandle() : base(ownsHandle: true) { }
 

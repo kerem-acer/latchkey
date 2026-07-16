@@ -11,24 +11,22 @@ namespace Latchkey.IntegrationTests;
 public class CrossProcessIntegrationTests
 {
     [Test]
-    public async Task Value_Written_By_Child_Process_Is_Readable_By_Parent()
+    public async Task ValueWrittenByChildProcessIsReadableByParent()
     {
         Integration.RequireBackend();
 
-        string service = Integration.UniqueService();
+        var service = Integration.UniqueService();
         var parent = LatchkeyFactory.Create(service);
         try
         {
             // Re-launch THIS same executable as the child (models an app restart). Using the same
             // binary matters on macOS: Keychain items carry a per-binary ACL, so a different binary
             // could read but not modify/delete what the child created (errSecInvalidOwnerEdit).
-            string exe = Environment.ProcessPath ?? "dotnet";
-            bool isMuxer = Path.GetFileNameWithoutExtension(exe).Equals("dotnet", StringComparison.OrdinalIgnoreCase);
-            string testDll = typeof(CrossProcessIntegrationTests).Assembly.Location;
+            var exe = Environment.ProcessPath ?? "dotnet";
+            var isMuxer = Path.GetFileNameWithoutExtension(exe).Equals("dotnet", StringComparison.OrdinalIgnoreCase);
+            var testDll = typeof(CrossProcessIntegrationTests).Assembly.Location;
 
-            var psi = isMuxer
-                ? new ProcessStartInfo(exe, $"exec \"{testDll}\"")
-                : new ProcessStartInfo(exe);
+            var psi = isMuxer ? new ProcessStartInfo(exe, $"exec \"{testDll}\"") : new ProcessStartInfo(exe);
             psi.UseShellExecute = false;
             psi.RedirectStandardOutput = true;
             psi.RedirectStandardError = true;
@@ -49,8 +47,12 @@ public class CrossProcessIntegrationTests
         {
             // Best-effort cleanup: a delete failing here (e.g. a cross-binary Keychain ACL on macOS)
             // must not fail a test whose persistence assertion already passed.
-            try { parent.Delete("cross"); }
-            catch (LatchkeyException) { }
+            try
+            {
+                parent.Delete("cross");
+            }
+            catch (LatchkeyException)
+            { }
         }
     }
 }

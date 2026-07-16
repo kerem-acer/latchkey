@@ -1,14 +1,13 @@
 using System.Runtime.InteropServices;
-using Latchkey.Native;
 
-namespace Latchkey;
+namespace Latchkey.Backends.WindowsCredential;
 
 /// <summary>
 /// Stores secrets in the Windows Credential Manager as CRED_TYPE_GENERIC credentials.
 /// Secrets are the raw credential blob — no encoding layer, so the full 2560-byte budget
 /// is usable. Values above that hard limit throw rather than being silently chunked.
 /// </summary>
-internal sealed unsafe class WindowsCredentialBackend : ISecretBackend
+sealed unsafe class WindowsCredentialBackend : ISecretBackend
 {
     /// <summary>CRED_MAX_CREDENTIAL_BLOB_SIZE. Values above this cannot be stored.</summary>
     internal const int MaxBlobSize = Advapi32.MaxCredentialBlobSize;
@@ -21,7 +20,12 @@ internal sealed unsafe class WindowsCredentialBackend : ISecretBackend
             {
                 // Probe the API with a surely-absent target. Success or ERROR_NOT_FOUND both
                 // prove advapi32 is usable; a missing library throws and means "not available".
-                _ = Advapi32.CredReadW("Latchkey:__availability_probe__", Advapi32.CredTypeGeneric, 0, out var handle);
+                _ = Advapi32.CredReadW(
+                    "Latchkey:__availability_probe__",
+                    Advapi32.CredTypeGeneric,
+                    0,
+                    out var handle);
+
                 handle.Dispose();
                 return true;
             }
@@ -36,23 +40,30 @@ internal sealed unsafe class WindowsCredentialBackend : ISecretBackend
         }
     }
 
-    public void Store(string service, string key, ReadOnlySpan<byte> value, string label)
+    public void Store(string service,
+        string key,
+        ReadOnlySpan<byte> value,
+        string label)
     {
         EnsureBlobFits(value.Length);
 
-        string target = TargetName(service, key);
-        string comment = Truncate(label, Advapi32.MaxStringLength);
+        var target = TargetName(service, key);
+        var comment = Truncate(label, Advapi32.MaxStringLength);
 
-        IntPtr targetPtr = Marshal.StringToHGlobalUni(target);
-        IntPtr commentPtr = Marshal.StringToHGlobalUni(comment);
-        IntPtr blobPtr = value.Length == 0 ? IntPtr.Zero : Marshal.AllocHGlobal(value.Length);
+        var targetPtr = Marshal.StringToHGlobalUni(target);
+        var commentPtr = Marshal.StringToHGlobalUni(comment);
+        var blobPtr = value.Length == 0 ? nint.Zero : Marshal.AllocHGlobal(value.Length);
         try
         {
             if (value.Length > 0)
             {
                 fixed (byte* src = value)
                 {
-                    Buffer.MemoryCopy(src, (void*)blobPtr, value.Length, value.Length);
+                    Buffer.MemoryCopy(
+                        src,
+                        (void*)blobPtr,
+                        value.Length,
+                        value.Length);
                 }
             }
 
@@ -63,23 +74,24 @@ internal sealed unsafe class WindowsCredentialBackend : ISecretBackend
                 Comment = commentPtr,
                 CredentialBlobSize = (uint)value.Length,
                 CredentialBlob = blobPtr,
-                Persist = Advapi32.CredPersistLocalMachine,
+                Persist = Advapi32.CredPersistLocalMachine
             };
 
             if (!Advapi32.CredWriteW(in cred, 0))
             {
-                int err = Marshal.GetLastPInvokeError();
+                var err = Marshal.GetLastPInvokeError();
                 throw new LatchkeyException($"CredWrite failed (Win32 error {err}) for target '{target}'.");
             }
         }
         finally
         {
-            if (blobPtr != IntPtr.Zero)
+            if (blobPtr != nint.Zero)
             {
                 // Wipe the secret from unmanaged memory before releasing it.
                 new Span<byte>((void*)blobPtr, value.Length).Clear();
                 Marshal.FreeHGlobal(blobPtr);
             }
+
             Marshal.FreeHGlobal(targetPtr);
             Marshal.FreeHGlobal(commentPtr);
         }
@@ -87,40 +99,60 @@ internal sealed unsafe class WindowsCredentialBackend : ISecretBackend
 
     public byte[]? Retrieve(string service, string key)
     {
-        string target = TargetName(service, key);
+        var target = TargetName(service, key);
 
-        if (!Advapi32.CredReadW(target, Advapi32.CredTypeGeneric, 0, out var handle))
+        if (!Advapi32.CredReadW(
+            target,
+            Advapi32.CredTypeGeneric,
+            0,
+            out var handle))
         {
-            int err = Marshal.GetLastPInvokeError();
+            var err = Marshal.GetLastPInvokeError();
             handle.Dispose();
             if (err == Advapi32.ErrorNotFound)
+            {
                 return null;
+            }
+
             throw new LatchkeyException($"CredRead failed (Win32 error {err}) for target '{target}'.");
         }
 
         using (handle)
         {
             var cred = (CREDENTIALW*)handle.DangerousGetHandle();
-            int size = (int)cred->CredentialBlobSize;
+            var size = (int)cred->CredentialBlobSize;
             if (size == 0)
-                return [];
+            {
+                return
+                    [];
+            }
 
             var result = new byte[size];
-            Marshal.Copy((IntPtr)cred->CredentialBlob, result, 0, size);
+            Marshal.Copy(
+                cred->CredentialBlob,
+                result,
+                0,
+                size);
+
             return result;
         }
     }
 
     public bool Remove(string service, string key)
     {
-        string target = TargetName(service, key);
+        var target = TargetName(service, key);
 
         if (Advapi32.CredDeleteW(target, Advapi32.CredTypeGeneric, 0))
+        {
             return true;
+        }
 
-        int err = Marshal.GetLastPInvokeError();
+        var err = Marshal.GetLastPInvokeError();
         if (err == Advapi32.ErrorNotFound)
+        {
             return false;
+        }
+
         throw new LatchkeyException($"CredDelete failed (Win32 error {err}) for target '{target}'.");
     }
 
@@ -131,10 +163,12 @@ internal sealed unsafe class WindowsCredentialBackend : ISecretBackend
     internal static void EnsureBlobFits(int length)
     {
         if (length > MaxBlobSize)
+        {
             throw new LatchkeyValueTooLargeException(
                 $"Value is {length} bytes; Windows Credential Manager allows at most {MaxBlobSize} bytes per credential.");
+        }
     }
 
-    private static string Truncate(string value, int maxLength) =>
+    static string Truncate(string value, int maxLength) =>
         value.Length <= maxLength ? value : value[..maxLength];
 }
