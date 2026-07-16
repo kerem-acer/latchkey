@@ -80,6 +80,28 @@ jobs:
         if: runner.os == 'Windows'
         run: dotnet test --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release
 
+  # Build the sample apps (so they can't bit-rot) and smoke-run the Tour end to end. The Tour uses an
+  # explicit File backend, so it runs on a bare runner with no OS keyring.
+  samples:
+    name: Samples build + smoke run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Build samples
+        run: |
+          dotnet build samples/Latchkey.QuickStart/Latchkey.QuickStart.csproj -c Release
+          dotnet build samples/Latchkey.Tour/Latchkey.Tour.csproj -c Release
+
+      - name: Smoke-run the Tour (File backend, headless-safe)
+        run: dotnet run --project samples/Latchkey.Tour -c Release --no-build
+
   # The failure path is a feature: on Linux with no Secret Service, detection must throw a clear,
   # actionable exception rather than silently falling back to an insecure file.
   headless-linux:
@@ -286,6 +308,9 @@ jobs:
     name: Coverage report + gate
     needs: [ coverage, pass-linux, systemd-creds-linux ]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # post the coverage comment on PRs
     steps:
       - uses: actions/setup-dotnet@v4
         with:
@@ -297,7 +322,8 @@ jobs:
           pattern: coverage-*
           merge-multiple: true
 
-      - name: Merge, report, and enforce threshold
+      - name: Merge and report
+        id: coverage
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool
           export PATH="$PATH:$HOME/.dotnet/tools"
@@ -309,6 +335,20 @@ jobs:
           cat coveragereport/Summary.txt
           cat coveragereport/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
           pct=$(grep -oiE 'Line coverage: [0-9.]+%' coveragereport/Summary.txt | head -1 | grep -oE '[0-9.]+')
+          echo "pct=${pct:-0}" >> "$GITHUB_OUTPUT"
+
+      # Post (and keep updating) a single coverage comment on same-repo PRs. Fork PRs get a read-only
+      # token, so skip them rather than fail. Runs before the gate so coverage shows even when it fails.
+      - name: Comment coverage on the PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage
+          path: coveragereport/SummaryGithub.md
+
+      - name: Enforce coverage threshold
+        run: |
+          pct=${{ steps.coverage.outputs.pct }}
           # Merged across all three OSes is ~94%. The uncovered remainder is native "throw if the OS
           # call unexpectedly fails" defensive branches, which can't be exercised without fault
           # injection into the P/Invoke layer — a compromise this thin-interop library avoids.
@@ -320,3 +360,17 @@ jobs:
             echo "::error::Line coverage ${pct}% is below the ${threshold}% threshold."
             exit 1
           fi
+
+  # Single required status check for branch protection: green only when every job above succeeded.
+  ci-success:
+    name: CI success
+    if: always()
+    needs: [ test, samples, headless-linux, pass-linux, systemd-creds-linux, coverage, coverage-report ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any needed job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more CI jobs failed or were cancelled."
+          exit 1
+      - run: echo "All CI jobs passed."

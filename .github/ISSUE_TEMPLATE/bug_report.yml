@@ -1,0 +1,67 @@
+name: Bug report
+description: Something isn't working as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do **not** report security vulnerabilities here — see the
+        Security link on the issue chooser.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+      placeholder: Get() returned null after a successful Set() and process restart…
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: A minimal snippet or steps. The smaller, the faster this gets fixed.
+      render: csharp
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other / multiple
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend
+      description: Which Latchkey backend? (Auto resolves to the native store for your OS.)
+      options:
+        - Auto (native)
+        - WindowsCredentialManager
+        - MacOSKeychain
+        - SecretService
+        - File
+        - Dpapi
+        - Pass
+        - SystemdCreds
+        - CustomBackend
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Latchkey version
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: tfm
+    attributes:
+      label: Target framework
+      placeholder: e.g. net8.0 or net10.0
+    validations:
+      required: false
