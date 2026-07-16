@@ -188,7 +188,7 @@ jobs:
         run: |
           sudo -E env "PATH=$PATH" \
             dotnet run --project tests/Latchkey.IntegrationTests/Latchkey.IntegrationTests.csproj -c Release -f net10.0 -- \
-              --treenode-filter "/*/*/SystemdCredsIntegrationTests/*" --minimum-expected-tests 1 \
+              --treenode-filter "/*/*/SystemdCredsIntegrationTests/*" --minimum-expected-tests 2 \
               --coverage --coverage-output-format cobertura --coverage-output sdcreds-${{ matrix.rid }}.cobertura.xml
 
       - name: Gather coverage

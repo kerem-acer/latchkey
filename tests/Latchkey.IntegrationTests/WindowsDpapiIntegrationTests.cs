@@ -101,6 +101,53 @@ public class WindowsDpapiIntegrationTests
         }
     }
 
+    [Test]
+    public async Task DpapiAsyncRoundTripsAndHandlesMissingKeys()
+    {
+        Integration.RequireWindows();
+        var (options, dir) = Make();
+        try
+        {
+            if (!Latchkey.VerifyPersistence(options))
+            {
+                Skip.Test("DPAPI is not usable here.");
+            }
+
+            var store = LatchkeyFactory.Create(options);
+
+            // DPAPI itself has no async form; the async path is the file write/read around it.
+            await store.SetAsync("token", "async-secret");
+            await Assert.That(await store.GetAsync("token")).IsEqualTo("async-secret");
+
+            byte[] data =
+            [
+                0x00,
+                0x2A,
+                0xFF,
+                0x00,
+                0x7F
+            ];
+
+            await store.SetAsync("bin", data);
+            await Assert.That((await store.GetBytesAsync("bin"))!.SequenceEqual(data)).IsTrue();
+
+            // A missing key is not exceptional, sync or async, and unprotect is never attempted.
+            await Assert.That(await store.GetAsync("missing")).IsNull();
+            await Assert.That(await store.DeleteAsync("missing")).IsFalse();
+            await Assert.That(store.Delete("missing")).IsFalse();
+
+            await Assert.That(await store.DeleteAsync("token")).IsTrue();
+            await Assert.That(await store.GetAsync("token")).IsNull();
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
     static bool Contains(byte[] haystack, byte[] needle)
     {
         for (var i = 0; i + needle.Length <= haystack.Length; i++)
