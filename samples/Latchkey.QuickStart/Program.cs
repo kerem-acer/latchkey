@@ -7,14 +7,14 @@ const string service = "dev.latchkey.quickstart";
 
 try
 {
-    ILatchkey store = LatchkeyFactory.Create(service);   // Auto-detects the native store for this OS
+    var store = LatchkeyFactory.Create(service); // Auto-detects the native store for this OS
 
-    store.Set("api-token", "s3cr3t");                    // upsert — there is no separate add/update
+    store.Set("api-token", "s3cr3t"); // upsert — there is no separate add/update
 
-    string? token = store.Get("api-token");              // "s3cr3t", or null if absent (missing is not an error)
+    var token = store.Get("api-token"); // "s3cr3t", or null if absent (missing is not an error)
     Console.WriteLine($"stored and read back    : {token}");
     Console.WriteLine($"contains 'api-token'    : {store.Contains("api-token")}");
-    Console.WriteLine($"delete 'api-token'      : {store.Delete("api-token")}");   // false if it wasn't there
+    Console.WriteLine($"delete 'api-token'      : {store.Delete("api-token")}"); // false if it wasn't there
     Console.WriteLine($"contains after delete   : {store.Contains("api-token")}");
 }
 catch (LatchkeyBackendUnavailableException ex)
