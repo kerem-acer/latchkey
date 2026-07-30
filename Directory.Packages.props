@@ -5,9 +5,9 @@
   </PropertyGroup>
   <!-- Testing (TUnit is source-generated; mocking requires C# 14). -->
   <ItemGroup>
-    <PackageVersion Include="CliWrap" Version="3.10.2" />
-    <PackageVersion Include="TUnit" Version="1.60.0" />
-    <PackageVersion Include="TUnit.Mocks" Version="1.60.0" />
+    <PackageVersion Include="CliWrap" Version="3.10.4" />
+    <PackageVersion Include="TUnit" Version="1.63.0" />
+    <PackageVersion Include="TUnit.Mocks" Version="1.63.0" />
   </ItemGroup>
   <!-- Benchmarks. -->
   <ItemGroup>
