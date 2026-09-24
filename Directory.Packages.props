@@ -5,9 +5,9 @@
   </PropertyGroup>
   <!-- Testing (TUnit is source-generated; mocking requires C# 14). -->
   <ItemGroup>
-    <PackageVersion Include="CliWrap" Version="3.10.2" />
-    <PackageVersion Include="TUnit" Version="1.60.0" />
-    <PackageVersion Include="TUnit.Mocks" Version="1.60.0" />
+    <PackageVersion Include="CliWrap" Version="3.10.5" />
+    <PackageVersion Include="TUnit" Version="1.69.0" />
+    <PackageVersion Include="TUnit.Mocks" Version="1.69.0" />
   </ItemGroup>
   <!-- Benchmarks. -->
   <ItemGroup>
@@ -16,10 +16,10 @@
   <!-- DI package only. Tracks the current Microsoft.Extensions.* release; these 10.x packages still
        target net8.0, so the net8.0 TFM is unaffected (net8.0 consumers just take the 10.x floor). -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
   </ItemGroup>
   <!-- Test-only: DI container + hosting implementation for the DI package's tests. -->
   <ItemGroup>
